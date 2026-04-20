@@ -272,6 +272,7 @@ const processUserRequest = async (message) => {
     topics: topics.map((topic, index) => ({
       name: topic,
       difficulty: index < topics.length / 3 ? 'easy' : index < 2 * topics.length / 3 ? 'medium' : 'hard',
+      priority: index < topics.length * 0.7 ? 'core' : 'supporting',
       dayNumber: Math.floor(index / (topics.length / days)) + 1
     }))
   });

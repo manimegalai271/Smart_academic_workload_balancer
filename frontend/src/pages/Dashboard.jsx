@@ -7,8 +7,22 @@ function Dashboard() {
   const [subjects, setSubjects] = useState([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [graphLoading, setGraphLoading] = useState(false)
+  const [graphData, setGraphData] = useState({ graph: [], warnings: [], suggestedOrder: '', hasCycle: false })
   const [editingSubject, setEditingSubject] = useState(null)
   const navigate = useNavigate()
+
+  const fetchGraph = async () => {
+    setGraphLoading(true)
+    try {
+      const res = await fetch('/api/subjects/graph')
+      const data = await res.json()
+      setGraphData(data)
+    } catch (error) {
+      console.error('Error fetching graph:', error)
+    }
+    setGraphLoading(false)
+  }
 
   useEffect(() => {
     fetchSubjects()
@@ -167,6 +181,35 @@ function Dashboard() {
         </div>
       )}
 
+      {/* Dependency Graph Section */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <h2>📊 Study Dependencies</h2>
+        <button 
+          className="btn btn-info mb-3" 
+          onClick={fetchGraph}
+          style={{ fontSize: '0.9rem' }}
+        >
+          Refresh Graph
+        </button>
+        {graphLoading ? (
+          <p>Loading graph...</p>
+        ) : graphData.warnings.length > 0 ? (
+          <div className="alert alert-warning">
+            <h4>⚠️ Graph Warnings:</h4>
+            <ul>
+              {graphData.warnings.map((warning, i) => <li key={i}>{warning}</li>)}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-muted">No dependencies detected. All subjects ready! ✅</p>
+        )}
+        {graphData.suggestedOrder && (
+          <div>
+            <strong>Suggested Order:</strong> {graphData.suggestedOrder}
+          </div>
+        )}
+      </div>
+
       <div className="card">
         <h2>Your Subjects</h2>
         {loading ? (
@@ -178,49 +221,77 @@ function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-3">
-            {subjects.map(subject => (
-              <div 
-                key={subject._id} 
-                className="subject-card"
-                onClick={() => handleSubjectClick(subject._id)}
-                style={{ cursor: 'pointer' }}
-              >
-                <h3>{subject.name}</h3>
-                <p>{subject.description}</p>
-                <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
-                    style={{ width: `${subject.progress || 0}%` }}
-                  ></div>
-                </div>
-                <p className="progress-text">
-                  {subject.completedTopics || 0} / {subject.totalTopics || 0} topics ({subject.progress || 0}%)
-                </p>
-                <p style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>
-                  Target: {subject.targetDays} days
-                </p>
+            {subjects.map(subject => {
+              const isLocked = subject.prerequisites && subject.prerequisites.length > 0 && graphData.graph.find(g => g.id === subject._id.toString())?.status === 'locked';
+              return (
                 <div 
-                  className="subject-actions" 
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ marginTop: '10px', display: 'flex', gap: '10px' }}
+                  key={subject._id} 
+                  className={`subject-card ${isLocked ? 'locked-subject' : ''}`}
+                  onClick={() => !isLocked && handleSubjectClick(subject._id)}
+                  style={{ cursor: isLocked ? 'not-allowed' : 'pointer', opacity: isLocked ? 0.6 : 1 }}
                 >
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={() => setEditingSubject(subject)}
-                    style={{ flex: 1, fontSize: '0.85rem' }}
-                  >
-                    ✏️ Edit
-                  </button>
-                  <button 
-                    className="btn btn-danger" 
-                    onClick={() => handleDeleteSubject(subject._id)}
-                    style={{ flex: 1, fontSize: '0.85rem' }}
-                  >
-                    🗑️ Delete
-                  </button>
+                  {isLocked && (
+                    <div className="lock-badge" style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '10px',
+                      background: 'red',
+                      color: 'white',
+                      borderRadius: '50%',
+                      width: '30px',
+                      height: '30px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.8rem',
+                      fontWeight: 'bold'
+                    }}>
+                      🔒
+                    </div>
+                  )}
+                  <h3>{subject.name}</h3>
+                  <p>{subject.description}</p>
+                  <div className="progress-bar">
+                    <div 
+                      className="progress-fill" 
+                      style={{ width: `${subject.progress || 0}%` }}
+                    ></div>
+                  </div>
+                  <p className="progress-text">
+                    {subject.completedTopics || 0} / {subject.totalTopics || 0} topics ({subject.progress || 0}%)
+                  </p>
+                  <p style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>
+                    Target: {subject.targetDays} days {subject.prerequisites?.length > 0 && `| Prereqs: ${subject.prerequisites.length}`}
+                  </p>
+                  {!isLocked ? (
+                    <div 
+                      className="subject-actions" 
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ marginTop: '10px', display: 'flex', gap: '10px' }}
+                    >
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={() => setEditingSubject(subject)}
+                        style={{ flex: 1, fontSize: '0.85rem' }}
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button 
+                        className="btn btn-danger" 
+                        onClick={() => handleDeleteSubject(subject._id)}
+                        style={{ flex: 1, fontSize: '0.85rem' }}
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', marginTop: '10px', color: '#666', fontSize: '0.85rem' }}>
+                      🔒 Complete prerequisites first
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

@@ -151,6 +151,90 @@ const getAllStudySessions = async (req, res) => {
   }
 };
 
+// Calculate study velocity and projected completion
+const getVelocity = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+    const subject = await Subject.findById(subjectId);
+    if (!subject) {
+      return res.status(404).json({ error: 'Subject not found' });
+    }
+
+    const remainingTopics = Math.max(0, subject.totalTopics - subject.completedTopics);
+    if (remainingTopics === 0) {
+      return res.json({
+        velocity: 1.0,
+        projectedDate: new Date().toISOString().split('T')[0],
+        riskLevel: 'completed',
+        daysNeeded: 0,
+        message: 'Subject completed!'
+      });
+    }
+
+    // Get last 7 days progress data
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentProgress = await Progress.find({
+      subjectId,
+      date: { $gte: sevenDaysAgo }
+    }).sort({ date: -1 });
+
+    let totalCompletedRecent = 0;
+    let daysWithData = 0;
+    recentProgress.forEach(p => {
+      if (p.topicsCompleted > 0) {
+        totalCompletedRecent += p.topicsCompleted;
+        daysWithData++;
+      }
+    });
+
+    // Daily averages
+    const dailyAvgTopics = daysWithData > 0 ? totalCompletedRecent / daysWithData : 0.1;
+    const plannedDaily = subject.totalTopics / subject.targetDays;
+    let velocity = plannedDaily > 0 ? dailyAvgTopics / plannedDaily : 1.0;
+    velocity = Math.max(0.1, Math.min(3.0, velocity)); // Clamp 0.1-3.0
+
+    // Update subject's lastVelocity
+    subject.lastVelocity = velocity;
+    await subject.save();
+
+    // Projection
+    const daysNeeded = dailyAvgTopics > 0 ? remainingTopics / dailyAvgTopics : 30;
+    const projectedDate = new Date();
+    projectedDate.setDate(projectedDate.getDate() + Math.ceil(daysNeeded));
+
+    // Risk assessment (if deadline set)
+    let riskLevel = 'low';
+    let riskMessage = '';
+    if (subject.deadline) {
+      const deadline = new Date(subject.deadline);
+      if (projectedDate > deadline) {
+        riskLevel = 'high';
+        riskMessage = `Warning: Projected finish (${projectedDate.toISOString().split('T')[0]}) after deadline!`;
+      } else if ((deadline - projectedDate) / (1000 * 60 * 60 * 24) < 3) {
+        riskLevel = 'medium';
+        riskMessage = 'Close to deadline - keep up the pace!';
+      } else {
+        riskMessage = 'On track!';
+      }
+    }
+
+    res.json({
+      velocity: parseFloat(velocity.toFixed(2)),
+      dailyAvgTopics: parseFloat(dailyAvgTopics.toFixed(2)),
+      remainingTopics,
+      daysNeeded: parseFloat(daysNeeded.toFixed(1)),
+      projectedDate: projectedDate.toISOString().split('T')[0],
+      riskLevel,
+      riskMessage,
+      lastUpdated: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAllProgress,
   getProgressBySubject,
@@ -160,6 +244,8 @@ module.exports = {
   createStudySession,
   completeStudySession,
   getStudySessionsBySubject,
-  getAllStudySessions
+  getAllStudySessions,
+  getVelocity
 };
+
 

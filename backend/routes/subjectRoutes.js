@@ -25,6 +25,12 @@ router.put('/:id', updateSubject);
 // Delete subject
 router.delete('/:id', deleteSubject);
 
+// Dependency graph
+// router.get('/graph', getDependencyGraph);
+
+// Pruning endpoint
+// router.post('/:id/prune', pruneTopics);
+
 // Mark topic as completed
 router.patch('/topic-complete', markTopicCompleted);
 

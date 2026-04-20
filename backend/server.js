@@ -19,6 +19,7 @@ app.use(express.json());
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/events', require('./routes/eventRoutes'));
 
 // AI Chat endpoint
 app.post('/api/ai/chat', async (req, res) => {

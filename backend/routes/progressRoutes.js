@@ -33,5 +33,8 @@ router.patch('/session/:id/complete', completeStudySession);
 router.get('/sessions/subject/:subjectId', getStudySessionsBySubject);
 router.get('/sessions', getAllStudySessions);
 
+// Velocity predictor
+// router.get('/velocity/:subjectId', getVelocity);
+
 module.exports = router;
 

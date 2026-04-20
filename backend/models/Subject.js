@@ -11,7 +11,16 @@ const topicSchema = new mongoose.Schema({
     enum: ['easy', 'medium', 'hard'],
     default: 'medium'
   },
+  priority: {
+    type: String,
+    enum: ['core', 'supporting'],
+    default: 'supporting'
+  },
   completed: {
+    type: Boolean,
+    default: false
+  },
+  hidden: {
     type: Boolean,
     default: false
   },
@@ -37,6 +46,14 @@ const subjectSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  lastVelocity: {
+    type: Number,
+    default: 1.0
+  },
+  prerequisites: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subject'
+  }],
   topics: [topicSchema],
   createdAt: {
     type: Date,
